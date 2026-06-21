@@ -1,0 +1,12 @@
+{
+  "name": "crunchstock",
+  "version": "1.0.0",
+  "description": "Masked B2B textile liquidation marketplace for Surat",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

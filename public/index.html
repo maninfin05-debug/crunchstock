@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CrunchStock — B2B Textile Liquidation Marketplace</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="header">
+  <a href="/" class="logo">
+    <div class="logo-mark">CS</div>
+    <span class="logo-name">Crunch<span>Stock</span></span>
+  </a>
+  <span class="header-tag">Masked B2B Liquidation · Surat</span>
+</header>
+
+<!-- ── Hero / Search ────────────────────────────────────────────────────── -->
+<section class="hero">
+  <h1>Find Dead-Stock Fabric. Bulk. Anonymous.</h1>
+  <p>Browse liquidation listings from Surat mills &amp; traders — supplier identity always masked</p>
+
+  <div class="search-wrap">
+    <input
+      id="searchInput"
+      type="text"
+      class="search-input"
+      placeholder="Search fabric type, color, usage, print style…"
+      autocomplete="off"
+    >
+    <button class="search-go" id="searchBtn" aria-label="Search">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    </button>
+  </div>
+
+  <button class="toggle-filters" id="toggleFilters">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="4" y1="6" x2="20" y2="6"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+      <line x1="11" y1="18" x2="13" y2="18"/>
+    </svg>
+    <span id="filterLabel">Show Filters</span>
+  </button>
+</section>
+
+<!-- ── Filters Panel ─────────────────────────────────────────────────────── -->
+<div class="filters-panel" id="filtersPanel">
+  <div class="filters-inner">
+    <div class="filters-grid">
+
+      <div class="fg">
+        <label for="f_fabric">Fabric Type</label>
+        <select id="f_fabric">
+          <option value="">All Types</option>
+          <option>Cotton Single Jersey</option>
+          <option>Polyester Georgette</option>
+          <option>Viscose Lycra Blend</option>
+          <option>Chanderi Silk Cotton</option>
+          <option>Polyester Chiffon</option>
+          <option>Cotton Voile</option>
+          <option>Denim Twill</option>
+          <option>Polyester Warp Knit Mesh</option>
+          <option>Rayon Slub</option>
+          <option>Net Fabric (Embroidered)</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_type">Type</label>
+        <select id="f_type">
+          <option value="">Fresh &amp; Lot</option>
+          <option value="Fresh">Fresh</option>
+          <option value="Lot">Lot</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_machine">Weaving Machine</label>
+        <select id="f_machine">
+          <option value="">All Machines</option>
+          <option>Circular Knitting</option>
+          <option>Warp Knitting</option>
+          <option>Airjet</option>
+          <option>Phatka Loom</option>
+          <option>Waterjet</option>
+          <option>Rapier</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_job">Job Work</label>
+        <select id="f_job">
+          <option value="">Any</option>
+          <option>None</option>
+          <option>Embroidery</option>
+          <option>Digital Print</option>
+          <option>Mill Print</option>
+          <option>Other</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_reason">Liquidation Reason</label>
+        <select id="f_reason">
+          <option value="">Any Reason</option>
+          <option>No demand</option>
+          <option>Outdated design</option>
+          <option>Weaving defect</option>
+          <option>Dyeing defect</option>
+          <option>Panna shrinkage</option>
+          <option>Outdated quality</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_unit">Quantity Unit</label>
+        <select id="f_unit">
+          <option value="">Meters &amp; KG</option>
+          <option value="meters">Meters</option>
+          <option value="kg">KG</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label for="f_gsm_min">GSM Min</label>
+        <input type="number" id="f_gsm_min" placeholder="e.g. 80" min="0">
+      </div>
+
+      <div class="fg">
+        <label for="f_gsm_max">GSM Max</label>
+        <input type="number" id="f_gsm_max" placeholder="e.g. 300" min="0">
+      </div>
+
+    </div>
+    <div class="filter-actions">
+      <button class="btn btn-primary btn-sm" id="applyFilters">Apply Filters</button>
+      <button class="btn btn-outline btn-sm" id="clearFilters">Clear All</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────── -->
+<main class="main">
+  <div class="results-bar">
+    <div class="results-count" id="resultsCount"></div>
+    <button class="link-btn hidden" id="clearTop">Clear filters</button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="loading" id="loading">Loading listings…</div>
+
+  <div class="empty hidden" id="empty">
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <h3>No listings found</h3>
+    <p>Try adjusting your search terms or clearing filters</p>
+  </div>
+</main>
+
+<footer>
+  CrunchStock — Masked B2B Textile Liquidation · Surat, Gujarat &nbsp;·&nbsp; Demo Prototype v1
+</footer>
+
+<!-- ── Detail Slide Panel ───────────────────────────────────────────────── -->
+<div class="detail-overlay" id="detailOverlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="detail-close" id="detailClose" aria-label="Close">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 18l-6-6 6-6"/>
+    </svg>
+  </button>
+  <div class="detail-thumb" id="detailThumb"></div>
+  <div class="detail-body" id="detailBody"></div>
+</div>
+
+<!-- ── Swatch Request Modal ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="swatchOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Request a Swatch</div>
+        <div class="modal-sub" id="swatchRef"></div>
+      </div>
+      <button class="modal-x" id="swatchClose" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="notice">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Your details are only shared with CrunchStock to arrange the swatch — never shown publicly.
+    </div>
+
+    <form id="swatchForm" novalidate>
+      <input type="hidden" id="swatchId">
+
+      <div class="fg-form">
+        <label for="buyerName">Full Name *</label>
+        <input type="text" id="buyerName" placeholder="Your name" required>
+      </div>
+
+      <div class="fg-form">
+        <label for="buyerPhone">Phone Number *</label>
+        <input type="tel" id="buyerPhone" placeholder="+91 XXXXX XXXXX" required>
+      </div>
+
+      <div class="fg-form">
+        <label for="buyerAddress">Postal Address *</label>
+        <textarea id="buyerAddress" placeholder="Full delivery address for the swatch…" required></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline" id="swatchCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07
+                     A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67
+                     A2 2 0 0 1 3.6 2.18H6.6a2 2 0 0 1 2 1.72
+                     c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.59 9.91
+                     a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45
+                     c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/>
+          </svg>
+          Submit &amp; Open WhatsApp
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

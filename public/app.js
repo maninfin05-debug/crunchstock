@@ -1,0 +1,312 @@
+/* ── Fabric colour map for placeholder thumbnails ─────────────────────── */
+const PALETTE = {
+  'Cotton Single Jersey':    ['#E8D5C0', '#C4956A'],
+  'Polyester Georgette':     ['#E8D5F5', '#9B59B6'],
+  'Viscose Lycra Blend':     ['#2D2D3E', '#1A1A2E'],
+  'Chanderi Silk Cotton':    ['#FFF8DC', '#C8A84B'],
+  'Polyester Chiffon':       ['#FFE4EE', '#F48FB1'],
+  'Cotton Voile':            ['#DCEEFB', '#5BA4CF'],
+  'Denim Twill':             ['#2C3E7A', '#1A237E'],
+  'Polyester Warp Knit Mesh':['#2D2D2D', '#111111'],
+  'Rayon Slub':              ['#FFF3E0', '#E8954A'],
+  'Net Fabric (Embroidered)':['#8B1A1A', '#C0392B'],
+};
+
+function thumbGradient(fabricType) {
+  const c = PALETTE[fabricType] || ['#64748B', '#475569'];
+  return `linear-gradient(135deg, ${c[0]} 0%, ${c[1]} 100%)`;
+}
+
+function fmtId(id) { return `CS-${String(id).padStart(4, '0')}`; }
+
+function esc(str) {
+  if (str == null) return '—';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ── Fetch helpers ────────────────────────────────────────────────────── */
+async function apiFetch(url, opts) {
+  const res = await fetch(url, opts);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Request failed');
+  return json;
+}
+
+/* ── Render listings ──────────────────────────────────────────────────── */
+function cardHTML(l) {
+  const bg   = thumbGradient(l.fabric_type);
+  const bc   = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
+  const qty  = l.quantity ? `${Number(l.quantity).toLocaleString()} ${l.quantity_unit}` : '—';
+
+  return `
+  <article class="card" data-id="${l.id}">
+    <div class="card-thumb" style="background:${bg}">
+      <span class="thumb-label">${esc(l.fabric_type)}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-id">${fmtId(l.id)}</div>
+      <div class="card-title">${esc(l.fabric_type)}</div>
+      <div class="chips">
+        ${l.gsm ? `<span class="chip">${l.gsm} GSM</span>` : ''}
+        ${l.color ? `<span class="chip">${esc(l.color)}</span>` : ''}
+        ${l.width_panna ? `<span class="chip">${l.width_panna}"</span>` : ''}
+        <span class="badge ${bc}">${esc(l.type)}</span>
+      </div>
+      <div class="card-meta">
+        <div class="meta-row">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+          ${esc(l.machine_category)}
+        </div>
+        <div class="meta-row">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          ${qty}
+        </div>
+      </div>
+      <div class="card-price">${esc(l.asking_price)}</div>
+      <button class="btn btn-primary btn-full swatch-btn" data-id="${l.id}" data-stop="1">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9"  y1="15" x2="15" y2="15"/>
+        </svg>
+        Request Swatch
+      </button>
+    </div>
+  </article>`;
+}
+
+async function loadListings(params = {}) {
+  setLoading(true);
+  try {
+    const url = new URL('/api/listings', location.origin);
+    Object.entries(params).forEach(([k, v]) => { if (v !== '' && v != null) url.searchParams.set(k, v); });
+
+    const data = await apiFetch(url);
+    renderGrid(data.listings, data.total, Object.values(params).some(Boolean));
+  } catch {
+    setLoading(false);
+    showEmpty();
+  }
+}
+
+function renderGrid(listings, total, hasFilters) {
+  const grid  = $('grid');
+  const count = $('resultsCount');
+  const top   = $('clearTop');
+
+  setLoading(false);
+
+  if (!listings.length) {
+    grid.innerHTML = '';
+    showEmpty();
+    count.innerHTML = '';
+    return;
+  }
+
+  $('empty').classList.add('hidden');
+  count.innerHTML = `Showing <strong>${total}</strong> listing${total !== 1 ? 's' : ''}`;
+  top.classList.toggle('hidden', !hasFilters);
+
+  grid.innerHTML = listings.map(cardHTML).join('');
+
+  grid.querySelectorAll('.swatch-btn').forEach(btn =>
+    btn.addEventListener('click', e => { e.stopPropagation(); openSwatch(btn.dataset.id); })
+  );
+  grid.querySelectorAll('.card').forEach(card =>
+    card.addEventListener('click', () => openDetail(card.dataset.id))
+  );
+}
+
+/* ── Detail panel ─────────────────────────────────────────────────────── */
+async function openDetail(id) {
+  try {
+    const l = await apiFetch(`/api/listings/${id}`);
+    const bg = thumbGradient(l.fabric_type);
+    const bc = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
+
+    $('detailThumb').style.background = bg;
+
+    $('detailBody').innerHTML = `
+      <div class="detail-id">${fmtId(l.id)}</div>
+      <div class="detail-title">${esc(l.fabric_type)}</div>
+      <span class="badge ${bc}">${esc(l.type)}</span>
+      <div class="detail-price">${esc(l.asking_price)}</div>
+
+      <table class="detail-table">
+        <tr><td>Content</td><td>${esc(l.content)}</td></tr>
+        <tr><td>GSM</td><td>${l.gsm ?? '—'}</td></tr>
+        <tr><td>Color</td><td>${esc(l.color)}</td></tr>
+        <tr><td>Width / Panna</td><td>${l.width_panna ? l.width_panna + '"' : '—'}</td></tr>
+        <tr><td>Quantity</td><td>${l.quantity ? Number(l.quantity).toLocaleString() + ' ' + l.quantity_unit : '—'}</td></tr>
+        <tr><td>Machine</td><td>${esc(l.machine_category)}</td></tr>
+        <tr><td>Job Work</td><td>${esc(l.job_work)}${l.job_work_specify ? ' — ' + esc(l.job_work_specify) : ''}</td></tr>
+        <tr><td>Usage</td><td>${esc(l.usage)}</td></tr>
+        <tr><td>Print / Design</td><td>${esc(l.print_design_type)}</td></tr>
+        <tr><td>Liquidation Reason</td><td>${esc(l.liquidation_reason)}</td></tr>
+        <tr><td>Listed</td><td>${new Date(l.created_at).toLocaleDateString('en-IN',
+          {day:'numeric', month:'short', year:'numeric'})}</td></tr>
+      </table>
+
+      <div class="notice">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Supplier identity fully masked — no company or contact info is shown publicly.
+      </div>
+
+      <button class="btn btn-primary btn-full" style="margin-top:8px"
+              onclick="openSwatch(${l.id}); closeDetail();">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        Request a Swatch
+      </button>`;
+
+    $('detailPanel').classList.add('open');
+    $('detailOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+function closeDetail() {
+  $('detailPanel').classList.remove('open');
+  $('detailOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ── Swatch modal ─────────────────────────────────────────────────────── */
+function openSwatch(id) {
+  $('swatchId').value = id;
+  $('swatchRef').textContent = `Listing ${fmtId(id)}`;
+  $('swatchOverlay').classList.add('open');
+  setTimeout(() => $('buyerName').focus(), 80);
+}
+
+function closeSwatch() {
+  $('swatchOverlay').classList.remove('open');
+  $('swatchForm').reset();
+}
+
+$('swatchForm').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const id      = $('swatchId').value;
+  const name    = $('buyerName').value.trim();
+  const phone   = $('buyerPhone').value.trim();
+  const address = $('buyerAddress').value.trim();
+
+  if (!name || !phone || !address) return;
+
+  const btn = e.submitter;
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const data = await apiFetch('/api/swatch-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listing_id: id, buyer_name: name, buyer_phone: phone, buyer_address: address })
+    });
+
+    const l   = data.listing;
+    const msg = encodeURIComponent(
+      `Hi CrunchStock,\n\nSwatch request:\n` +
+      `Listing: ${fmtId(l.id)}\n` +
+      `Fabric: ${l.fabric_type}\n` +
+      `Color: ${l.color}\n` +
+      `GSM: ${l.gsm}\n` +
+      `Price: ${l.asking_price}\n\n` +
+      `Buyer:\n` +
+      `Name: ${name}\n` +
+      `Phone: ${phone}\n` +
+      `Address: ${address}\n\n` +
+      `Please send the swatch. Thank you.`
+    );
+
+    closeSwatch();
+    window.open(`https://wa.me/447553683413?text=${msg}`, '_blank');
+  } catch (err) {
+    alert('Could not submit: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07
+               A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67
+               A2 2 0 0 1 3.6 2.18H6.6a2 2 0 0 1 2 1.72
+               c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.59 9.91
+               a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45
+               c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/>
+    </svg> Submit &amp; Open WhatsApp`;
+  }
+});
+
+/* ── Filter / search wiring ───────────────────────────────────────────── */
+let filtersOpen = false;
+
+$('toggleFilters').addEventListener('click', () => {
+  filtersOpen = !filtersOpen;
+  $('filtersPanel').classList.toggle('open', filtersOpen);
+  $('filterLabel').textContent = filtersOpen ? 'Hide Filters' : 'Show Filters';
+});
+
+function gatherParams() {
+  return {
+    q:                  $('searchInput').value.trim(),
+    fabric_type:        $('f_fabric').value,
+    type:               $('f_type').value,
+    machine_category:   $('f_machine').value,
+    job_work:           $('f_job').value,
+    liquidation_reason: $('f_reason').value,
+    quantity_unit:      $('f_unit').value,
+    gsm_min:            $('f_gsm_min').value,
+    gsm_max:            $('f_gsm_max').value,
+  };
+}
+
+function doSearch() { loadListings(gatherParams()); }
+function clearAll() {
+  $('searchInput').value = '';
+  ['f_fabric','f_type','f_machine','f_job','f_reason','f_unit']
+    .forEach(id => $(id).value = '');
+  ['f_gsm_min','f_gsm_max']
+    .forEach(id => $(id).value = '');
+  loadListings();
+}
+
+$('searchBtn').addEventListener('click', doSearch);
+$('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+$('applyFilters').addEventListener('click', doSearch);
+$('clearFilters').addEventListener('click', clearAll);
+$('clearTop').addEventListener('click', clearAll);
+
+$('detailClose').addEventListener('click', closeDetail);
+$('detailOverlay').addEventListener('click', closeDetail);
+$('swatchClose').addEventListener('click', closeSwatch);
+$('swatchCancel').addEventListener('click', closeSwatch);
+$('swatchOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSwatch(); });
+
+/* ── Utilities ────────────────────────────────────────────────────────── */
+function $(id)          { return document.getElementById(id); }
+function setLoading(on) { $('loading').classList.toggle('hidden', !on); }
+function showEmpty()    { $('empty').classList.remove('hidden'); }
+
+/* ── Boot ─────────────────────────────────────────────────────────────── */
+loadListings();
