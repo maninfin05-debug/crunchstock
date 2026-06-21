@@ -192,19 +192,50 @@ function closeDetail() {
 }
 
 /* ── Swatch modal ─────────────────────────────────────────────────────── */
+
+// Cached listing data — populated as soon as the modal opens so it's
+// ready by the time the user hits Submit, without blocking the redirect.
+let _cachedListing = null;
+
 function openSwatch(id) {
+  _cachedListing = null;
   $('swatchId').value = id;
   $('swatchRef').textContent = `Listing ${fmtId(id)}`;
   $('swatchOverlay').classList.add('open');
   setTimeout(() => $('buyerName').focus(), 80);
+
+  // Fetch in background while user fills the form — no await, no blocking.
+  fetch(`/api/listings/${id}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(l => { if (l) _cachedListing = l; })
+    .catch(() => {});
 }
 
 function closeSwatch() {
   $('swatchOverlay').classList.remove('open');
   $('swatchForm').reset();
+  const btn = document.querySelector('#swatchForm [type=submit]');
+  btn.disabled = false;
+  btn.innerHTML = SUBMIT_BTN_HTML;
 }
 
-$('swatchForm').addEventListener('submit', async e => {
+function buildWaMessage(id, name, phone, address) {
+  const l = _cachedListing || {};
+  return encodeURIComponent(
+    `Hi CrunchStock,\n\nSwatch request:\n` +
+    `Listing: ${fmtId(id)}\n` +
+    (l.fabric_type  ? `Fabric: ${l.fabric_type}\n`   : '') +
+    (l.color        ? `Color: ${l.color}\n`           : '') +
+    (l.gsm          ? `GSM: ${l.gsm}\n`               : '') +
+    (l.asking_price ? `Price: ${l.asking_price}\n`    : '') +
+    `\nBuyer:\nName: ${name}\nPhone: ${phone}\nAddress: ${address}` +
+    `\n\nPlease send the swatch. Thank you.`
+  );
+}
+
+// Submit is intentionally NOT async — window.open() must fire
+// synchronously from the user gesture so mobile browsers don't block it.
+$('swatchForm').addEventListener('submit', e => {
   e.preventDefault();
 
   const id      = $('swatchId').value;
@@ -214,48 +245,27 @@ $('swatchForm').addEventListener('submit', async e => {
 
   if (!name || !phone || !address) return;
 
+  // Show loading state immediately.
   const btn = e.submitter;
   btn.disabled = true;
-  btn.textContent = 'Sending…';
+  btn.innerHTML = `
+    <svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+    </svg> Opening WhatsApp…`;
 
-  try {
-    const data = await apiFetch('/api/swatch-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ listing_id: id, buyer_name: name, buyer_phone: phone, buyer_address: address })
-    });
+  // Fire DB save in the background — we don't wait for it.
+  // WhatsApp captures all the info even if this fails.
+  fetch('/api/swatch-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing_id: id, buyer_name: name, buyer_phone: phone, buyer_address: address })
+  }).catch(() => {});
 
-    const l   = data.listing;
-    const msg = encodeURIComponent(
-      `Hi CrunchStock,\n\nSwatch request:\n` +
-      `Listing: ${fmtId(l.id)}\n` +
-      `Fabric: ${l.fabric_type}\n` +
-      `Color: ${l.color}\n` +
-      `GSM: ${l.gsm}\n` +
-      `Price: ${l.asking_price}\n\n` +
-      `Buyer:\n` +
-      `Name: ${name}\n` +
-      `Phone: ${phone}\n` +
-      `Address: ${address}\n\n` +
-      `Please send the swatch. Thank you.`
-    );
-
-    closeSwatch();
-    window.open(`https://wa.me/447553683413?text=${msg}`, '_blank');
-  } catch (err) {
-    alert('Could not submit: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07
-               A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67
-               A2 2 0 0 1 3.6 2.18H6.6a2 2 0 0 1 2 1.72
-               c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.59 9.91
-               a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45
-               c.907.339 1.85.573 2.81.7a2 2 0 0 1 1.72 2.02z"/>
-    </svg> Submit &amp; Open WhatsApp`;
-  }
+  // Open WhatsApp immediately — synchronous, right here in the gesture handler.
+  const waUrl = `https://wa.me/447553683413?text=${buildWaMessage(id, name, phone, address)}`;
+  closeSwatch();
+  window.open(waUrl, '_blank');
 });
 
 /* ── Filter / search wiring ───────────────────────────────────────────── */
@@ -309,4 +319,7 @@ function setLoading(on) { $('loading').classList.toggle('hidden', !on); }
 function showEmpty()    { $('empty').classList.remove('hidden'); }
 
 /* ── Boot ─────────────────────────────────────────────────────────────── */
+// Capture submit button's default HTML so closeSwatch() can restore it.
+const SUBMIT_BTN_HTML = document.querySelector('#swatchForm [type=submit]').innerHTML;
+
 loadListings();

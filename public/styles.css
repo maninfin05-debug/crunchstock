@@ -636,6 +636,10 @@ footer {
 }
 .link-btn:hover { text-decoration: underline; }
 
+/* ── Spinner ──────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.7s linear infinite; display: inline-block; }
+
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .header-tag       { display: none; }
