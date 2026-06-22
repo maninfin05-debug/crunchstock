@@ -1,28 +1,35 @@
-const express = require('express');
-const { createClient } = require('@libsql/client');
-const multer  = require('multer');
-const path    = require('path');
-const fs      = require('fs');
+const express            = require('express');
+const { createClient }   = require('@libsql/client');
+const multer             = require('multer');
+const path               = require('path');
+const { v2: cloudinary } = require('cloudinary');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── Uploads ───────────────────────────────────────────────────────────────────
-const UPLOADS_DIR = path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-app.use('/uploads', express.static(UPLOADS_DIR));
+// ── Cloudinary ────────────────────────────────────────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
+function uploadToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader.upload_stream({ folder: 'crunchstock' }, (err, result) => {
+      if (err) reject(err);
+      else resolve(result.secure_url);
+    }).end(buffer);
+  });
+}
+
+// ── Uploads (memory storage for Cloudinary) ───────────────────────────────────
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: UPLOADS_DIR,
-    filename: (_req, file, cb) => {
-      const safe = file.originalname.replace(/[^a-zA-Z0-9.\-]/g, '_');
-      cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safe}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { files: 5, fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
@@ -214,7 +221,12 @@ app.post('/api/listings', (req, res, next) => {
   if (!fabric_type || !supplier_phone)
     return res.status(400).json({ error: 'Fabric type and supplier phone are required' });
 
-  const imagePaths = (req.files || []).map(f => `/uploads/${f.filename}`);
+  let imageUrls = [];
+  try {
+    imageUrls = await Promise.all((req.files || []).map(f => uploadToCloudinary(f.buffer)));
+  } catch (err) {
+    return res.status(500).json({ error: 'Image upload failed: ' + err.message });
+  }
 
   try {
     const ir = await db.execute({
@@ -241,7 +253,7 @@ app.post('/api/listings', (req, res, next) => {
         quantity_unit || null,
         asking_price ? asking_price.trim() : null,
         supplier_phone.trim(),
-        imagePaths.length ? JSON.stringify(imagePaths) : null,
+        imageUrls.length ? JSON.stringify(imageUrls) : null,
       ],
     });
     res.json({ success: true, id: Number(ir.lastInsertRowid) });
@@ -278,20 +290,133 @@ app.post('/api/admin/listings/:id/approve', adminAuth, async (req, res) => {
 
 app.post('/api/admin/listings/:id/reject', adminAuth, async (req, res) => {
   try {
-    const lr = await db.execute({
-      sql:  'SELECT uploaded_images FROM listings WHERE id = ?',
+    await db.execute({ sql: 'DELETE FROM listings WHERE id = ?', args: [req.params.id] });
+    res.redirect('/admin');
+  } catch (err) {
+    res.status(500).send(esc(err.message));
+  }
+});
+
+app.post('/api/admin/listings/:id/hold', adminAuth, async (req, res) => {
+  try {
+    await db.execute({
+      sql:  "UPDATE listings SET status = 'hold' WHERE id = ?",
       args: [req.params.id],
     });
-    const row = lr.rows[0];
-    if (row?.uploaded_images) {
-      try {
-        JSON.parse(row.uploaded_images).forEach(p => {
-          const full = path.join(__dirname, p);
-          if (fs.existsSync(full)) fs.unlinkSync(full);
-        });
-      } catch {}
-    }
+    res.redirect('/admin');
+  } catch (err) {
+    res.status(500).send(esc(err.message));
+  }
+});
+
+app.post('/api/admin/listings/:id/delete', adminAuth, async (req, res) => {
+  try {
     await db.execute({ sql: 'DELETE FROM listings WHERE id = ?', args: [req.params.id] });
+    res.redirect('/admin');
+  } catch (err) {
+    res.status(500).send(esc(err.message));
+  }
+});
+
+app.get('/api/admin/listings/:id/edit', adminAuth, async (req, res) => {
+  try {
+    const result = await db.execute({
+      sql:  'SELECT * FROM listings WHERE id = ?',
+      args: [req.params.id],
+    });
+    const l = result.rows[0];
+    if (!l) return res.status(404).send('Listing not found');
+
+    const v = f => esc(l[f]);
+    const inp = (name, label, type = 'text') => `
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">${label}</label>
+        <input name="${name}" type="${type}" value="${v(name)}"
+          style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;color:#111827">
+      </div>`;
+    const sel = (name, label, options) => `
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px">${label}</label>
+        <select name="${name}" style="padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;color:#111827">
+          <option value="">—</option>
+          ${options.map(o => `<option value="${esc(o)}"${l[name] === o ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+        </select>
+      </div>`;
+
+    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Edit CS-${String(l.id).padStart(4,'0')}</title>
+    <style>
+      body{font-family:system-ui,sans-serif;max-width:820px;margin:32px auto;padding:0 20px;color:#111827;background:#f9fafb}
+      h1{font-size:20px;margin-bottom:4px}
+      .sub{color:#6b7280;font-size:13px;margin-bottom:28px}
+      .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:24px}
+    </style></head><body>
+    <h1>Edit Listing CS-${String(l.id).padStart(4,'0')}</h1>
+    <p class="sub"><a href="/admin">← Back to Admin</a></p>
+    <form method="POST" action="/api/admin/listings/${l.id}/edit">
+      <div class="grid">
+        ${inp('fabric_type', 'Fabric Type')}
+        ${inp('gsm', 'GSM', 'number')}
+        ${inp('content', 'Content')}
+        ${sel('type', 'Type', ['Fresh', 'Lot'])}
+        ${inp('usage', 'Usage')}
+        ${sel('machine_category', 'Machine Category', ['Circular Knitting','Warp Knitting','Rapier','Airjet','Waterjet','Other'])}
+        ${sel('job_work', 'Job Work', ['None','Mill Print','Digital Print','Embroidery','Other'])}
+        ${inp('job_work_specify', 'Job Work (specify)')}
+        ${sel('liquidation_reason', 'Listing Reason', ['No demand','Outdated design','Outdated quality','Panna shrinkage','Dyeing defect','Weaving defect','Other'])}
+        ${inp('print_design_type', 'Print / Design Type')}
+        ${inp('color', 'Color')}
+        ${inp('width_panna', 'Width / Panna (inches)', 'number')}
+        ${inp('quantity', 'Quantity', 'number')}
+        ${sel('quantity_unit', 'Quantity Unit', ['meters','kg','pieces'])}
+        ${inp('asking_price', 'Asking Price')}
+        ${inp('supplier_phone', 'Supplier Phone')}
+      </div>
+      <button type="submit" style="background:#111827;color:#fff;border:none;padding:10px 28px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer">Save Changes</button>
+      <a href="/admin" style="margin-left:14px;font-size:13px;color:#6b7280">Cancel</a>
+    </form>
+    </body></html>`);
+  } catch (err) {
+    res.status(500).send(esc(err.message));
+  }
+});
+
+app.post('/api/admin/listings/:id/edit', adminAuth, async (req, res) => {
+  try {
+    const {
+      fabric_type, gsm, content, type, usage, machine_category,
+      job_work, job_work_specify, liquidation_reason, print_design_type,
+      color, width_panna, quantity, quantity_unit, asking_price, supplier_phone,
+    } = req.body;
+
+    await db.execute({
+      sql: `UPDATE listings SET
+              fabric_type = ?, gsm = ?, content = ?, type = ?, usage = ?,
+              machine_category = ?, job_work = ?, job_work_specify = ?,
+              liquidation_reason = ?, print_design_type = ?, color = ?,
+              width_panna = ?, quantity = ?, quantity_unit = ?,
+              asking_price = ?, supplier_phone = ?
+            WHERE id = ?`,
+      args: [
+        fabric_type     ? fabric_type.trim()         : null,
+        gsm             ? Number(gsm)                : null,
+        content         ? content.trim()             : null,
+        type            || null,
+        usage           ? usage.trim()               : null,
+        machine_category || null,
+        job_work        || null,
+        job_work_specify ? job_work_specify.trim()   : null,
+        liquidation_reason || null,
+        print_design_type ? print_design_type.trim() : null,
+        color           ? color.trim()               : null,
+        width_panna     ? Number(width_panna)        : null,
+        quantity        ? Number(quantity)           : null,
+        quantity_unit   || null,
+        asking_price    ? asking_price.trim()        : null,
+        supplier_phone  ? supplier_phone.trim()      : null,
+        req.params.id,
+      ],
+    });
     res.redirect('/admin');
   } catch (err) {
     res.status(500).send(esc(err.message));
@@ -301,8 +426,9 @@ app.post('/api/admin/listings/:id/reject', adminAuth, async (req, res) => {
 // ── Admin page ────────────────────────────────────────────────────────────────
 app.get('/admin', adminAuth, async (_req, res) => {
   try {
-    const [pendingResult, reqResult, liveResult] = await Promise.all([
+    const [pendingResult, holdResult, reqResult, liveResult] = await Promise.all([
       db.execute("SELECT * FROM listings WHERE status = 'pending' ORDER BY created_at DESC"),
+      db.execute("SELECT * FROM listings WHERE status = 'hold' ORDER BY created_at DESC"),
       db.execute(`
         SELECT sr.id, sr.listing_id, sr.buyer_name, sr.buyer_phone, sr.buyer_address,
                sr.created_at, l.fabric_type, l.color, l.asking_price
@@ -314,11 +440,12 @@ app.get('/admin', adminAuth, async (_req, res) => {
     ]);
 
     const pending  = pendingResult.rows;
+    const onHold   = holdResult.rows;
     const requests = reqResult.rows;
     const listings = liveResult.rows;
 
-    // ── Pending listing cards ──────────────────────────────────────────────
-    const pendingCards = pending.length ? pending.map(l => {
+    // ── Shared listing card builder ────────────────────────────────────────
+    const buildCard = (l, actionButtons) => {
       const images = (() => { try { return l.uploaded_images ? JSON.parse(l.uploaded_images) : []; } catch { return []; } })();
       const imgStrip = images.length
         ? images.map(p => `<img src="${esc(p)}" style="height:90px;width:90px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb">`).join('')
@@ -337,14 +464,7 @@ app.get('/admin', adminAuth, async (_req, res) => {
             <div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:3px">CS-${String(l.id).padStart(4,'0')} &middot; Submitted ${new Date(l.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
             <div style="font-size:20px;font-weight:800;color:#111827">${esc(l.fabric_type)}</div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0">
-            <form method="POST" action="/api/admin/listings/${l.id}/approve">
-              <button type="submit" style="background:#059669;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Approve</button>
-            </form>
-            <form method="POST" action="/api/admin/listings/${l.id}/reject" onsubmit="return confirm('Reject and permanently delete this listing?')">
-              <button type="submit" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Reject</button>
-            </form>
-          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">${actionButtons}</div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px">
@@ -369,7 +489,30 @@ app.get('/admin', adminAuth, async (_req, res) => {
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${imgStrip}</div>
       </div>`;
-    }).join('') : '<p style="color:#9ca3af;padding:12px 0;font-size:14px">No pending listings.</p>';
+    };
+
+    // ── Pending listing cards ──────────────────────────────────────────────
+    const pendingCards = pending.length ? pending.map(l => buildCard(l, `
+      <form method="POST" action="/api/admin/listings/${l.id}/approve">
+        <button type="submit" style="background:#059669;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Approve</button>
+      </form>
+      <form method="POST" action="/api/admin/listings/${l.id}/hold">
+        <button type="submit" style="background:#d97706;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Hold</button>
+      </form>
+      <form method="POST" action="/api/admin/listings/${l.id}/reject" onsubmit="return confirm('Reject and permanently delete this listing?')">
+        <button type="submit" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Reject</button>
+      </form>
+    `)).join('') : '<p style="color:#9ca3af;padding:12px 0;font-size:14px">No pending listings.</p>';
+
+    // ── On Hold / Waitlist cards ───────────────────────────────────────────
+    const holdCards = onHold.length ? onHold.map(l => buildCard(l, `
+      <form method="POST" action="/api/admin/listings/${l.id}/approve">
+        <button type="submit" style="background:#059669;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Approve</button>
+      </form>
+      <form method="POST" action="/api/admin/listings/${l.id}/delete" onsubmit="return confirm('Permanently delete this listing?')">
+        <button type="submit" style="background:#fff;color:#dc2626;border:1.5px solid #dc2626;padding:8px 20px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer">Delete</button>
+      </form>
+    `)).join('') : '<p style="color:#9ca3af;padding:12px 0;font-size:14px">No listings on hold.</p>';
 
     // ── Swatch request rows ────────────────────────────────────────────────
     const cell    = v => `<td>${esc(v)}</td>`;
@@ -392,6 +535,15 @@ app.get('/admin', adminAuth, async (_req, res) => {
         <td>${esc(l.quantity)} ${esc(l.quantity_unit)}</td>
         <td>${esc(l.machine_category)}</td>
         <td>${esc(l.asking_price)}</td>
+        <td style="white-space:nowrap">
+          <a href="/api/admin/listings/${l.id}/edit"
+            style="display:inline-block;padding:4px 12px;background:#3b82f6;color:#fff;border-radius:5px;font-size:12px;font-weight:700;text-decoration:none;margin-right:6px">Edit</a>
+          <form method="POST" action="/api/admin/listings/${l.id}/delete" style="display:inline"
+            onsubmit="return confirm('Permanently delete this listing?')">
+            <button type="submit"
+              style="padding:4px 12px;background:#fff;color:#dc2626;border:1.5px solid #dc2626;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">Delete</button>
+          </form>
+        </td>
       </tr>`;
     }).join('');
 
@@ -404,6 +556,7 @@ app.get('/admin', adminAuth, async (_req, res) => {
       h2{font-size:15px;font-weight:700;margin:32px 0 12px;border-bottom:2px solid #e5e7eb;padding-bottom:8px;color:#111827}
       .badge-count{background:#e5e7eb;color:#374151;border-radius:20px;padding:2px 9px;font-size:12px;font-weight:600;margin-left:6px}
       .badge-pending{background:#fef3c7;color:#92400e}
+      .badge-hold{background:#fef3c7;color:#92400e}
       table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
       th{text-align:left;padding:10px 12px;background:#f3f4f6;font-weight:600;border-bottom:2px solid #e5e7eb;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:#6b7280}
       td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:top}
@@ -417,6 +570,9 @@ app.get('/admin', adminAuth, async (_req, res) => {
     <h2>Pending Listings <span class="badge-count badge-pending">${pending.length}</span></h2>
     ${pendingCards}
 
+    <h2>On Hold / Waitlist <span class="badge-count badge-hold">${onHold.length}</span></h2>
+    ${holdCards}
+
     <h2>Swatch Requests <span class="badge-count">${requests.length}</span></h2>
     <table>
       <tr><th>#</th><th>Listing</th><th>Fabric</th><th>Buyer Name</th><th>Phone</th><th>Address</th><th>Requested At</th></tr>
@@ -425,7 +581,7 @@ app.get('/admin', adminAuth, async (_req, res) => {
 
     <h2>Live Listings <span class="badge-count">${listings.length}</span></h2>
     <table>
-      <tr><th>ID</th><th>Fabric</th><th>Type</th><th>GSM</th><th>Color</th><th>Qty</th><th>Machine</th><th>Price</th></tr>
+      <tr><th>ID</th><th>Fabric</th><th>Type</th><th>GSM</th><th>Color</th><th>Qty</th><th>Machine</th><th>Price</th><th>Actions</th></tr>
       ${listRows}
     </table>
 
