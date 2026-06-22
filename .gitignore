@@ -2,3 +2,4 @@ node_modules/
 crunchstock.db
 *.db-shm
 *.db-wal
+uploads/
