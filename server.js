@@ -79,7 +79,11 @@ async function migrateDb() {
     'ALTER TABLE listings ADD COLUMN uploaded_images TEXT',
   ]) {
     try { await db.execute(sql); }
-    catch (e) { if (!e.message.includes('already has a column named')) throw e; }
+    catch (e) {
+      const msg = e.message.toLowerCase();
+      if (msg.includes('already has a column named') || msg.includes('duplicate column name')) continue;
+      throw e;
+    }
   }
   await db.execute("UPDATE listings SET status = 'approved' WHERE status IS NULL");
 }
