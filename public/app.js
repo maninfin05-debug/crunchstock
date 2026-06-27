@@ -12,8 +12,8 @@ const PALETTE = {
   'Net Fabric (Embroidered)':['#8B1A1A','#C0392B'],
 };
 
-function thumbGradient(fabricType) {
-  const c = PALETTE[fabricType] || ['#64748B','#475569'];
+function thumbGradient(f) {
+  const c = PALETTE[f] || ['#64748B','#475569'];
   return `linear-gradient(135deg, ${c[0]} 0%, ${c[1]} 100%)`;
 }
 
@@ -26,9 +26,11 @@ function esc(str) {
   return d.innerHTML;
 }
 
-/* ── Fetch helpers ────────────────────────────────────────────────────── */
-async function apiFetch(url, opts) {
-  const res  = await fetch(url, opts);
+function $(id) { return document.getElementById(id); }
+
+/* ── API ──────────────────────────────────────────────────────────────── */
+async function apiFetch(url) {
+  const res  = await fetch(url);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error || 'Request failed');
   return json;
@@ -38,57 +40,47 @@ async function apiFetch(url, opts) {
 function cardHTML(l) {
   const bc  = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
   const qty = l.quantity ? `${Number(l.quantity).toLocaleString()} ${l.quantity_unit}` : '—';
+  const bg  = thumbGradient(l.fabric_type);
 
-  let thumbHtml;
+  let thumbContent;
   try {
     const imgs = l.uploaded_images ? JSON.parse(l.uploaded_images) : [];
-    if (imgs.length > 0) {
-      thumbHtml = `<img src="${esc(imgs[0])}" alt="${esc(l.fabric_type)}"
-        style="width:100%;height:100%;object-fit:cover;display:block;">`;
-    } else {
-      thumbHtml = `<span class="thumb-label">${esc(l.fabric_type)}</span>`;
-    }
+    thumbContent = imgs.length
+      ? `<img src="${esc(imgs[0])}" alt="${esc(l.fabric_type)}" style="width:100%;height:100%;object-fit:cover;display:block;">`
+      : `<span class="thumb-label">${esc(l.fabric_type)}</span>`;
   } catch {
-    thumbHtml = `<span class="thumb-label">${esc(l.fabric_type)}</span>`;
+    thumbContent = `<span class="thumb-label">${esc(l.fabric_type)}</span>`;
   }
-
-  const bg = thumbGradient(l.fabric_type);
 
   return `
   <article class="card" data-id="${l.id}">
-    <div class="card-thumb" style="background:${bg}">
-      ${thumbHtml}
-    </div>
+    <div class="card-thumb" style="background:${bg}">${thumbContent}</div>
     <div class="card-body">
       <div class="card-id">${fmtId(l.id)}</div>
       <div class="card-title">${esc(l.fabric_type)}</div>
       <div class="chips">
-        ${l.gsm   ? `<span class="chip">${l.gsm} GSM</span>` : ''}
-        ${l.color ? `<span class="chip">${esc(l.color)}</span>` : ''}
+        ${l.gsm         ? `<span class="chip">${l.gsm} GSM</span>` : ''}
+        ${l.color       ? `<span class="chip">${esc(l.color)}</span>` : ''}
         ${l.width_panna ? `<span class="chip">${l.width_panna}"</span>` : ''}
         <span class="badge ${bc}">${esc(l.type)}</span>
       </div>
       <div class="card-meta">
         <div class="meta-row">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
           </svg>
           ${esc(l.machine_category)}
         </div>
         <div class="meta-row">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-            <circle cx="12" cy="10" r="3"/>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
           </svg>
           ${qty}
         </div>
       </div>
       <div class="card-price">${esc(l.asking_price)}</div>
-      <button class="btn btn-primary btn-full swatch-btn" data-id="${l.id}" data-stop="1">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <button class="btn btn-primary btn-full swatch-btn" data-id="${l.id}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
         </svg>
@@ -107,169 +99,107 @@ function attachCardListeners(grid) {
   );
 }
 
-/* ── Homepage: load Fresh and Lot separately ──────────────────────────── */
-async function loadHomeSections() {
-  // Fresh
-  try {
-    const freshUrl = new URL('/api/listings', location.origin);
-    freshUrl.searchParams.set('type', 'Fresh');
-    const freshData = await apiFetch(freshUrl);
-    const freshGrid = $('freshGrid');
-    $('freshLoading').classList.add('hidden');
-    if (freshData.listings.length) {
-      freshGrid.innerHTML = freshData.listings.slice(0, 6).map(cardHTML).join('');
-      attachCardListeners(freshGrid);
-    } else {
-      $('freshEmpty').classList.remove('hidden');
-    }
-    // update stat counter
-    updateStatTotal();
-  } catch (e) {
-    $('freshLoading').classList.add('hidden');
-    $('freshEmpty').classList.remove('hidden');
-  }
+/* ── Load listings ────────────────────────────────────────────────────── */
+let activeType = 'Fresh'; // track current tab
 
-  // Lot
-  try {
-    const lotUrl = new URL('/api/listings', location.origin);
-    lotUrl.searchParams.set('type', 'Lot');
-    const lotData = await apiFetch(lotUrl);
-    const lotGrid = $('lotGrid');
-    $('lotLoading').classList.add('hidden');
-    if (lotData.listings.length) {
-      lotGrid.innerHTML = lotData.listings.slice(0, 6).map(cardHTML).join('');
-      attachCardListeners(lotGrid);
-    } else {
-      $('lotEmpty').classList.remove('hidden');
-    }
-    updateStatTotal();
-  } catch (e) {
-    $('lotLoading').classList.add('hidden');
-    $('lotEmpty').classList.remove('hidden');
-  }
-}
+async function loadListings(type, extraParams = {}) {
+  activeType = type;
 
-let _totalFresh = 0, _totalLot = 0, _totalsLoaded = 0;
-async function updateStatTotal() {
-  try {
-    const [f, l] = await Promise.all([
-      apiFetch(new URL('/api/listings?type=Fresh', location.origin)),
-      apiFetch(new URL('/api/listings?type=Lot',   location.origin)),
-    ]);
-    const el = $('statTotal');
-    if (el) el.textContent = (f.total + l.total) + '+';
-  } catch {}
-}
+  // Update tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
 
-/* ── Search mode ──────────────────────────────────────────────────────── */
-let inSearchMode = false;
-
-function enterSearchMode() {
-  if (!inSearchMode) {
-    inSearchMode = true;
-    $('homeSections').classList.add('hidden');
-    $('searchResults').classList.remove('hidden');
-  }
-}
-
-function exitSearchMode() {
-  inSearchMode = false;
-  $('homeSections').classList.remove('hidden');
-  $('searchResults').classList.add('hidden');
-  $('searchGrid').innerHTML = '';
-  $('searchEmpty').classList.add('hidden');
-}
-
-async function doSearch() {
-  const params = gatherParams();
-  const hasAny = Object.values(params).some(v => v !== '' && v != null);
-
-  if (!hasAny) {
-    exitSearchMode();
-    return;
-  }
-
-  enterSearchMode();
-  $('searchLoading').classList.remove('hidden');
-  $('searchEmpty').classList.add('hidden');
-  $('searchGrid').innerHTML = '';
+  $('loading').classList.remove('hidden');
+  $('grid').innerHTML = '';
+  $('empty').classList.add('hidden');
 
   try {
     const url = new URL('/api/listings', location.origin);
-    Object.entries(params).forEach(([k, v]) => { if (v !== '' && v != null) url.searchParams.set(k, v); });
-    const data = await apiFetch(url);
-    $('searchLoading').classList.add('hidden');
+    if (type) url.searchParams.set('type', type);
+    Object.entries(extraParams).forEach(([k, v]) => {
+      if (v !== '' && v != null) url.searchParams.set(k, v);
+    });
 
-    const count = $('resultsCount');
-    const top   = $('clearTop');
+    const data = await apiFetch(url);
+    $('loading').classList.add('hidden');
+
+    const hasFilters = type !== '' || Object.values(extraParams).some(Boolean);
+    const label = type === 'Fresh' ? 'Fresh' : type === 'Lot' ? 'Lot / Surplus' : '';
 
     if (!data.listings.length) {
-      $('searchEmpty').classList.remove('hidden');
-      count.innerHTML = '';
-      top.classList.add('hidden');
+      $('empty').classList.remove('hidden');
+      $('resultsCount').innerHTML = '';
+      $('clearTop').classList.add('hidden');
       return;
     }
 
-    count.innerHTML = `Showing <strong>${data.total}</strong> listing${data.total !== 1 ? 's' : ''}`;
-    top.classList.remove('hidden');
-    $('searchGrid').innerHTML = data.listings.map(cardHTML).join('');
-    attachCardListeners($('searchGrid'));
+    $('resultsCount').innerHTML = label
+      ? `Showing <strong>${data.total}</strong> ${label} listing${data.total !== 1 ? 's' : ''}`
+      : `Showing <strong>${data.total}</strong> listing${data.total !== 1 ? 's' : ''}`;
+
+    $('clearTop').classList.toggle('hidden', !hasFilters || type !== '');
+    $('grid').innerHTML = data.listings.map(cardHTML).join('');
+    attachCardListeners($('grid'));
   } catch {
-    $('searchLoading').classList.add('hidden');
-    $('searchEmpty').classList.remove('hidden');
+    $('loading').classList.add('hidden');
+    $('empty').classList.remove('hidden');
   }
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    loadListings(btn.dataset.type, gatherFilterParams());
+  });
+});
+
+/* ── Hero buttons → instant tab switch ───────────────────────────────── */
+$('heroFreshBtn').addEventListener('click', () => {
+  window.scrollTo({ top: document.querySelector('.tab-bar').offsetTop - 116, behavior: 'smooth' });
+  setTimeout(() => loadListings('Fresh'), 100);
+});
+
+$('heroLotBtn').addEventListener('click', () => {
+  window.scrollTo({ top: document.querySelector('.tab-bar').offsetTop - 116, behavior: 'smooth' });
+  setTimeout(() => loadListings('Lot'), 100);
+});
+
+/* ── Search ───────────────────────────────────────────────────────────── */
+function gatherFilterParams() {
+  return {
+    q:                $('searchInput').value.trim(),
+    machine_category: $('f_machine').value,
+    job_work:         $('f_job').value,
+    quantity_unit:    $('f_unit').value,
+    gsm_min:          $('f_gsm_min').value,
+    gsm_max:          $('f_gsm_max').value,
+  };
+}
+
+function doSearch() {
+  loadListings(activeType, gatherFilterParams());
 }
 
 function clearAll() {
   $('searchInput').value = '';
-  ['f_fabric','f_machine','f_job','f_reason','f_unit'].forEach(id => $(id).value = '');
+  ['f_machine','f_job','f_unit'].forEach(id => $(id).value = '');
   ['f_gsm_min','f_gsm_max'].forEach(id => $(id).value = '');
-  exitSearchMode();
+  loadListings(activeType);
 }
 
-function gatherParams() {
-  return {
-    q:                  $('searchInput').value.trim(),
-    fabric_type:        $('f_fabric').value,
-    machine_category:   $('f_machine').value,
-    job_work:           $('f_job').value,
-    liquidation_reason: $('f_reason').value,
-    quantity_unit:      $('f_unit').value,
-    gsm_min:            $('f_gsm_min').value,
-    gsm_max:            $('f_gsm_max').value,
-  };
-}
+$('searchBtn').addEventListener('click', doSearch);
+$('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+$('applyFilters').addEventListener('click', doSearch);
+$('clearFilters').addEventListener('click', clearAll);
+$('clearTop').addEventListener('click', clearAll);
 
-/* ── View All buttons ─────────────────────────────────────────────────── */
-document.querySelectorAll('.view-all-btn').forEach(btn => {
-  btn.addEventListener('click', e => {
-    e.preventDefault();
-    const type = btn.dataset.type;
-    $('searchInput').value = '';
-    ['f_fabric','f_machine','f_job','f_reason','f_unit'].forEach(id => $(id).value = '');
-    ['f_gsm_min','f_gsm_max'].forEach(id => $(id).value = '');
-    enterSearchMode();
-    $('searchLoading').classList.remove('hidden');
-    $('searchEmpty').classList.add('hidden');
-    $('searchGrid').innerHTML = '';
-
-    const url = new URL('/api/listings', location.origin);
-    url.searchParams.set('type', type);
-    apiFetch(url).then(data => {
-      $('searchLoading').classList.add('hidden');
-      $('resultsCount').innerHTML = `Showing all <strong>${data.total}</strong> ${type} listing${data.total !== 1 ? 's' : ''}`;
-      $('clearTop').classList.remove('hidden');
-      if (data.listings.length) {
-        $('searchGrid').innerHTML = data.listings.map(cardHTML).join('');
-        attachCardListeners($('searchGrid'));
-      } else {
-        $('searchEmpty').classList.remove('hidden');
-      }
-    }).catch(() => {
-      $('searchLoading').classList.add('hidden');
-      $('searchEmpty').classList.remove('hidden');
-    });
-  });
+/* ── Filters toggle ───────────────────────────────────────────────────── */
+let filtersOpen = false;
+$('toggleFilters').addEventListener('click', () => {
+  filtersOpen = !filtersOpen;
+  $('filtersPanel').classList.toggle('open', filtersOpen);
+  $('filterLabel').textContent = filtersOpen ? 'Hide Filters' : 'Filters';
 });
 
 /* ── Detail panel ─────────────────────────────────────────────────────── */
@@ -278,28 +208,28 @@ async function openDetail(id) {
     const l  = await apiFetch(`/api/listings/${id}`);
     const bg = thumbGradient(l.fabric_type);
     const bc = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
-
-    // Thumb: image or gradient
     const dt = $('detailThumb');
+
     try {
       const imgs = l.uploaded_images ? JSON.parse(l.uploaded_images) : [];
-      if (imgs.length > 0) {
+      if (imgs.length) {
         dt.style.background = bg;
-        let strip = `<img src="${esc(imgs[0])}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
-        if (imgs.length > 1) {
-          strip += `<div style="display:flex;gap:6px;padding:8px;background:#f9fafb;border-top:1px solid #e5e7eb;overflow-x:auto">` +
-            imgs.slice(1).map(u => `<img src="${esc(u)}" style="height:64px;width:64px;object-fit:cover;border-radius:6px;flex-shrink:0;">`).join('') +
-            `</div>`;
-          dt.style.height = 'auto';
-        }
-        dt.innerHTML = strip;
+        dt.style.height = 'auto';
+        dt.innerHTML = `<img src="${esc(imgs[0])}" style="width:100%;height:200px;object-fit:cover;display:block;">` +
+          (imgs.length > 1
+            ? `<div style="display:flex;gap:6px;padding:8px;background:#f9fafb;border-top:1px solid #e5e7eb;overflow-x:auto">` +
+              imgs.slice(1).map(u => `<img src="${esc(u)}" style="height:64px;width:64px;object-fit:cover;border-radius:6px;flex-shrink:0;">`).join('') +
+              `</div>`
+            : '');
       } else {
         dt.innerHTML = '';
         dt.style.background = bg;
+        dt.style.height = '200px';
       }
     } catch {
       dt.innerHTML = '';
       dt.style.background = bg;
+      dt.style.height = '200px';
     }
 
     $('detailBody').innerHTML = `
@@ -318,20 +248,17 @@ async function openDetail(id) {
         <tr><td>Usage</td><td>${esc(l.usage)}</td></tr>
         <tr><td>Print / Design</td><td>${esc(l.print_design_type)}</td></tr>
         <tr><td>Listing Reason</td><td>${esc(l.liquidation_reason)}</td></tr>
-        <tr><td>Listed</td><td>${new Date(l.created_at).toLocaleDateString('en-IN',
-          {day:'numeric',month:'short',year:'numeric'})}</td></tr>
+        <tr><td>Listed</td><td>${new Date(l.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</td></tr>
       </table>
       <div class="notice">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
         Supplier identity fully masked — no company or contact info shown publicly.
       </div>
       <button class="btn btn-primary btn-full" style="margin-top:8px"
               onclick="openSwatch(${l.id}); closeDetail();">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
           <polyline points="14 2 14 8 20 8"/>
         </svg>
@@ -397,11 +324,9 @@ $('swatchForm').addEventListener('submit', e => {
 
   const btn = e.submitter;
   btn.disabled = true;
-  btn.innerHTML = `
-    <svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-    </svg> Opening WhatsApp…`;
+  btn.innerHTML = `<svg class="spin" width="15" height="15" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Opening WhatsApp…`;
 
   fetch('/api/swatch-requests', {
     method: 'POST',
@@ -409,34 +334,27 @@ $('swatchForm').addEventListener('submit', e => {
     body: JSON.stringify({ listing_id: id, buyer_name: name, buyer_phone: phone, buyer_address: address })
   }).catch(() => {});
 
-  const waUrl = `https://wa.me/447553683413?text=${buildWaMessage(id, name, phone, address)}`;
   closeSwatch();
-  window.open(waUrl, '_blank');
+  window.open(`https://wa.me/447553683413?text=${buildWaMessage(id, name, phone, address)}`, '_blank');
 });
 
-/* ── Filters wiring ───────────────────────────────────────────────────── */
-let filtersOpen = false;
-$('toggleFilters').addEventListener('click', () => {
-  filtersOpen = !filtersOpen;
-  $('filtersPanel').classList.toggle('open', filtersOpen);
-  $('filterLabel').textContent = filtersOpen ? 'Hide Filters' : 'Filters';
-});
-
-$('searchBtn').addEventListener('click', doSearch);
-$('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-$('applyFilters').addEventListener('click', doSearch);
-$('clearFilters').addEventListener('click', clearAll);
-$('clearTop').addEventListener('click', clearAll);
-
+/* ── Event listeners ──────────────────────────────────────────────────── */
 $('detailClose').addEventListener('click', closeDetail);
 $('detailOverlay').addEventListener('click', closeDetail);
 $('swatchClose').addEventListener('click', closeSwatch);
 $('swatchCancel').addEventListener('click', closeSwatch);
 $('swatchOverlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSwatch(); });
 
-/* ── Utilities ────────────────────────────────────────────────────────── */
-function $(id) { return document.getElementById(id); }
+/* ── Stat counter ─────────────────────────────────────────────────────── */
+async function updateStatTotal() {
+  try {
+    const data = await apiFetch('/api/listings');
+    const el = $('statTotal');
+    if (el) el.textContent = data.total + '+';
+  } catch {}
+}
 
 /* ── Boot ─────────────────────────────────────────────────────────────── */
 const SUBMIT_BTN_HTML = document.querySelector('#swatchForm [type=submit]').innerHTML;
-loadHomeSections();
+loadListings('Fresh');
+updateStatTotal();

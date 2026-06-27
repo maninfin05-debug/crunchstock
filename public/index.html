@@ -10,25 +10,27 @@
 
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
 <header class="header">
-  <a href="/" class="logo">
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <a href="/supplier" class="btn btn-primary btn-sm" style="white-space:nowrap;text-decoration:none">List Your Stock</a>
+  </div>
+  <a href="/" class="logo logo-center">
     <div class="logo-mark">CS</div>
     <span class="logo-name">Crunch<span>Stock</span></span>
   </a>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+  <div style="margin-right:auto;display:flex;align-items:center;gap:10px">
     <span class="header-tag">Masked B2B · Surat</span>
-    <a href="/supplier" class="btn btn-primary btn-sm" style="white-space:nowrap;text-decoration:none">List Your Stock</a>
   </div>
 </header>
 
 <!-- ── Hero ────────────────────────────────────────────────────────────── -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-eyebrow">Surat's Fabric Liquidation Market — Online</div>
-    <h1>Dead Stock Ko<br><span class="hero-accent">Deal Mein Badlo.</span></h1>
-    <p>Fresh fabric, surplus lots — direct from mills and traders.<br>No middlemen. No identity revealed. Pure business.</p>
+    <div class="hero-eyebrow">Surat's B2B Fabric Marketplace — Online</div>
+    <h1>Har Roll Ka Sahi Buyer.<br><span class="hero-accent">Har Buyer Ka Sahi Roll.</span></h1>
+    <p>Fresh stock aur surplus lots — mills aur traders se seedha.<br>No middlemen. No identity revealed. Pure business.</p>
     <div class="hero-ctas">
-      <a href="#fresh" class="btn btn-hero-primary">Browse Fresh Stock</a>
-      <a href="#lot" class="btn btn-hero-outline">Browse Lot / Surplus</a>
+      <button class="btn btn-hero-primary" id="heroFreshBtn">🟢 Browse Fresh Stock</button>
+      <button class="btn btn-hero-outline" id="heroLotBtn">🟡 Browse Lot / Surplus</button>
     </div>
     <div class="hero-stats">
       <div class="hero-stat"><span id="statTotal">—</span><em>Live Listings</em></div>
@@ -70,17 +72,6 @@
   <div class="filters-inner">
     <div class="filters-grid">
       <div class="fg">
-        <label for="f_fabric">Fabric Type</label>
-        <select id="f_fabric">
-          <option value="">All Types</option>
-          <option>Cotton Single Jersey</option><option>Polyester Georgette</option>
-          <option>Viscose Lycra Blend</option><option>Chanderi Silk Cotton</option>
-          <option>Polyester Chiffon</option><option>Cotton Voile</option>
-          <option>Denim Twill</option><option>Polyester Warp Knit Mesh</option>
-          <option>Rayon Slub</option><option>Net Fabric (Embroidered)</option>
-        </select>
-      </div>
-      <div class="fg">
         <label for="f_machine">Weaving Machine</label>
         <select id="f_machine">
           <option value="">All Machines</option>
@@ -98,19 +89,12 @@
         </select>
       </div>
       <div class="fg">
-        <label for="f_reason">Listing Reason</label>
-        <select id="f_reason">
-          <option value="">Any Reason</option>
-          <option>No demand</option><option>Outdated design</option>
-          <option>Weaving defect</option><option>Dyeing defect</option>
-          <option>Panna shrinkage</option><option>Outdated quality</option>
-        </select>
-      </div>
-      <div class="fg">
         <label for="f_unit">Quantity Unit</label>
         <select id="f_unit">
-          <option value="">Meters &amp; KG</option>
-          <option value="meters">Meters</option><option value="kg">KG</option>
+          <option value="">All Units</option>
+          <option value="meters">Meters</option>
+          <option value="kg">KG</option>
+          <option value="rolls">Rolls</option>
         </select>
       </div>
       <div class="fg">
@@ -129,15 +113,24 @@
   </div>
 </div>
 
-<!-- ── Search Results (shown only when searching) ──────────────────────── -->
-<main class="main hidden" id="searchResults">
+<!-- ── Active Section Tab Bar ──────────────────────────────────────────── -->
+<div class="tab-bar" id="tabBar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" id="tabFresh" data-type="Fresh">🟢 Fresh Stock</button>
+    <button class="tab-btn" id="tabLot" data-type="Lot">🟡 Lot / Surplus</button>
+    <button class="tab-btn" id="tabAll" data-type="">All Listings</button>
+  </div>
+</div>
+
+<!-- ── Listings ─────────────────────────────────────────────────────────── -->
+<main class="main">
   <div class="results-bar">
     <div class="results-count" id="resultsCount"></div>
-    <button class="link-btn" id="clearTop">Clear filters</button>
+    <button class="link-btn hidden" id="clearTop">Clear filters</button>
   </div>
-  <div class="grid" id="searchGrid"></div>
-  <div class="loading hidden" id="searchLoading">Loading…</div>
-  <div class="empty hidden" id="searchEmpty">
+  <div class="grid" id="grid"></div>
+  <div class="loading" id="loading">Loading…</div>
+  <div class="empty hidden" id="empty">
     <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
          stroke-linecap="round" stroke-linejoin="round">
       <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -147,62 +140,6 @@
   </div>
 </main>
 
-<!-- ── Homepage Sections (shown when not searching) ────────────────────── -->
-<div id="homeSections">
-
-  <!-- FRESH STOCK -->
-  <section class="listing-section" id="fresh">
-    <div class="section-inner">
-      <div class="section-header">
-        <div class="section-label-wrap">
-          <span class="section-badge badge-fresh-section">Fresh</span>
-          <div>
-            <h2 class="section-title">Fresh Stock</h2>
-            <p class="section-sub">New, unsold fabric direct from mills — full rolls, consistent quality.</p>
-          </div>
-        </div>
-        <a href="#" class="btn btn-outline btn-sm view-all-btn" data-type="Fresh">View All Fresh →</a>
-      </div>
-      <div class="grid" id="freshGrid"></div>
-      <div class="loading" id="freshLoading">Loading…</div>
-      <div class="empty hidden" id="freshEmpty">
-        <h3>No fresh listings yet</h3>
-        <p>Check back soon or <a href="/supplier">list your stock</a></p>
-      </div>
-    </div>
-  </section>
-
-  <!-- DIVIDER -->
-  <div class="section-divider-wrap">
-    <div class="section-divider-line"></div>
-    <span class="section-divider-text">Also available</span>
-    <div class="section-divider-line"></div>
-  </div>
-
-  <!-- LOT / SURPLUS -->
-  <section class="listing-section section-lot" id="lot">
-    <div class="section-inner">
-      <div class="section-header">
-        <div class="section-label-wrap">
-          <span class="section-badge badge-lot-section">Lot</span>
-          <div>
-            <h2 class="section-title">Lot / Surplus Stock</h2>
-            <p class="section-sub">Surplus, deadstock and discontinued fabric — liquidation priced for bulk buyers.</p>
-          </div>
-        </div>
-        <a href="#" class="btn btn-outline btn-sm view-all-btn" data-type="Lot">View All Lot →</a>
-      </div>
-      <div class="grid" id="lotGrid"></div>
-      <div class="loading" id="lotLoading">Loading…</div>
-      <div class="empty hidden" id="lotEmpty">
-        <h3>No lot listings yet</h3>
-        <p>Check back soon or <a href="/supplier">list your stock</a></p>
-      </div>
-    </div>
-  </section>
-
-</div>
-
 <!-- ── Footer ───────────────────────────────────────────────────────────── -->
 <footer>
   <div class="footer-inner">
@@ -210,7 +147,7 @@
       <div class="logo-mark" style="width:28px;height:28px;font-size:12px">CS</div>
       <span style="font-weight:700;color:#111827">CrunchStock</span>
     </div>
-    <p>Masked B2B Textile Liquidation · Surat, Gujarat</p>
+    <p>Masked B2B Textile Marketplace · Surat, Gujarat</p>
     <p style="margin-top:4px">
       <a href="/supplier" style="color:var(--primary);text-decoration:none;font-weight:600">List Your Stock →</a>
     </p>
