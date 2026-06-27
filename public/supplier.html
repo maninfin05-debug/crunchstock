@@ -135,7 +135,20 @@
       padding: 3px 10px;
       font-size: 12px;
       color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
+    .chip-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      font-size: 15px;
+      line-height: 1;
+      color: var(--muted);
+    }
+    .chip-remove:hover { color: #dc2626; }
     .phone-notice {
       background: #fff7ed;
       border: 1px solid #fed7aa;
@@ -392,12 +405,25 @@
     if (!isOther) specifyInput.value = '';
   });
 
+  let selectedFiles = [];
+
   imagesInput.addEventListener('change', () => {
-    const files = Array.from(imagesInput.files).slice(0, 5);
-    fileList.innerHTML = files.map(f =>
-      `<span class="file-chip">${f.name}</span>`
-    ).join('');
+    Array.from(imagesInput.files).forEach(f => {
+      if (selectedFiles.length < 5 && !selectedFiles.some(x => x.name === f.name && x.size === f.size))
+        selectedFiles.push(f);
+    });
+    imagesInput.value = '';
+    renderChips();
   });
+
+  function renderChips() {
+    fileList.innerHTML = selectedFiles.map((f, i) =>
+      `<span class="file-chip">${f.name}<button type="button" class="chip-remove" data-i="${i}" aria-label="Remove">&times;</button></span>`
+    ).join('');
+    fileList.querySelectorAll('.chip-remove').forEach(btn =>
+      btn.addEventListener('click', () => { selectedFiles.splice(+btn.dataset.i, 1); renderChips(); })
+    );
+  }
 
   form.addEventListener('submit', async e => {
     e.preventDefault();
@@ -415,6 +441,9 @@
     submitBtn.textContent = 'Submitting…';
 
     try {
+      const dt = new DataTransfer();
+      selectedFiles.forEach(f => dt.items.add(f));
+      imagesInput.files = dt.files;
       const fd = new FormData(form);
       const r  = await fetch('/api/listings', { method: 'POST', body: fd });
       const data = await r.json();

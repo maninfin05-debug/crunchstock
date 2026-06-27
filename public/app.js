@@ -40,10 +40,17 @@ function cardHTML(l) {
   const bc   = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
   const qty  = l.quantity ? `${Number(l.quantity).toLocaleString()} ${l.quantity_unit}` : '—';
 
+  let images = [];
+  try { if (l.uploaded_images) images = JSON.parse(l.uploaded_images); } catch {}
+
+  const thumbInner = images[0]
+    ? `<img src="${images[0]}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`
+    : `<span class="thumb-label">${esc(l.fabric_type)}</span>`;
+
   return `
   <article class="card" data-id="${l.id}">
     <div class="card-thumb" style="background:${bg}">
-      <span class="thumb-label">${esc(l.fabric_type)}</span>
+      ${thumbInner}
     </div>
     <div class="card-body">
       <div class="card-id">${fmtId(l.id)}</div>
@@ -136,13 +143,27 @@ async function openDetail(id) {
     const bg = thumbGradient(l.fabric_type);
     const bc = l.type === 'Fresh' ? 'badge-fresh' : 'badge-lot';
 
-    $('detailThumb').style.background = bg;
+    let imgs = [];
+    try { if (l.uploaded_images) imgs = JSON.parse(l.uploaded_images); } catch {}
+
+    const detailThumb = $('detailThumb');
+    detailThumb.style.background = bg;
+    detailThumb.innerHTML = imgs[0]
+      ? `<img src="${imgs[0]}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">`
+      : '';
+
+    const imgGallery = imgs.length > 1
+      ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+           ${imgs.map(u => `<img src="${u}" alt="" style="height:70px;width:70px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb">`).join('')}
+         </div>`
+      : '';
 
     $('detailBody').innerHTML = `
       <div class="detail-id">${fmtId(l.id)}</div>
       <div class="detail-title">${esc(l.fabric_type)}</div>
       <span class="badge ${bc}">${esc(l.type)}</span>
       <div class="detail-price">${esc(l.asking_price)}</div>
+      ${imgGallery}
 
       <table class="detail-table">
         <tr><td>Content</td><td>${esc(l.content)}</td></tr>
