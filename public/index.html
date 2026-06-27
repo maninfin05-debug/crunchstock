@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CrunchStock — B2B Textile Liquidation Marketplace</title>
+  <title>CrunchStock — B2B Fabric Liquidation · Surat</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,131 +15,112 @@
     <span class="logo-name">Crunch<span>Stock</span></span>
   </a>
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
-    <span class="header-tag">Masked B2B Liquidation · Surat</span>
+    <span class="header-tag">Masked B2B · Surat</span>
     <a href="/supplier" class="btn btn-primary btn-sm" style="white-space:nowrap;text-decoration:none">List Your Stock</a>
   </div>
 </header>
 
-<!-- ── Hero / Search ────────────────────────────────────────────────────── -->
+<!-- ── Hero ────────────────────────────────────────────────────────────── -->
 <section class="hero">
-  <h1>Buy &amp; Sell Fabric. Bulk. Direct. Anonymous.</h1>
-  <p>Connect with verified fabric suppliers and buyers — identities always protected.</p>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">Surat's Fabric Liquidation Market — Online</div>
+    <h1>Dead Stock Ko<br><span class="hero-accent">Deal Mein Badlo.</span></h1>
+    <p>Fresh fabric, surplus lots — direct from mills and traders.<br>No middlemen. No identity revealed. Pure business.</p>
+    <div class="hero-ctas">
+      <a href="#fresh" class="btn btn-hero-primary">Browse Fresh Stock</a>
+      <a href="#lot" class="btn btn-hero-outline">Browse Lot / Surplus</a>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><span id="statTotal">—</span><em>Live Listings</em></div>
+      <div class="hero-stat-divider"></div>
+      <div class="hero-stat"><span>100%</span><em>Anonymous</em></div>
+      <div class="hero-stat-divider"></div>
+      <div class="hero-stat"><span>B2B</span><em>Verified Buyers</em></div>
+    </div>
+  </div>
+</section>
 
-  <div class="search-wrap">
-    <input
-      id="searchInput"
-      type="text"
-      class="search-input"
-      placeholder="Search fabric type, color, usage, print style…"
-      autocomplete="off"
-    >
-    <button class="search-go" id="searchBtn" aria-label="Search">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+<!-- ── Search + Filters ─────────────────────────────────────────────────── -->
+<div class="search-bar-wrap">
+  <div class="search-bar-inner">
+    <div class="search-wrap">
+      <input id="searchInput" type="text" class="search-input"
+        placeholder="Search fabric, color, GSM, print style…" autocomplete="off">
+      <button class="search-go" id="searchBtn" aria-label="Search">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </button>
+    </div>
+    <button class="toggle-filters" id="toggleFilters">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        <line x1="4" y1="6" x2="20" y2="6"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+        <line x1="11" y1="18" x2="13" y2="18"/>
       </svg>
+      <span id="filterLabel">Filters</span>
     </button>
   </div>
-
-  <button class="toggle-filters" id="toggleFilters">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="4" y1="6" x2="20" y2="6"/>
-      <line x1="8" y1="12" x2="16" y2="12"/>
-      <line x1="11" y1="18" x2="13" y2="18"/>
-    </svg>
-    <span id="filterLabel">Show Filters</span>
-  </button>
-</section>
+</div>
 
 <!-- ── Filters Panel ─────────────────────────────────────────────────────── -->
 <div class="filters-panel" id="filtersPanel">
   <div class="filters-inner">
     <div class="filters-grid">
-
       <div class="fg">
         <label for="f_fabric">Fabric Type</label>
         <select id="f_fabric">
           <option value="">All Types</option>
-          <option>Cotton Single Jersey</option>
-          <option>Polyester Georgette</option>
-          <option>Viscose Lycra Blend</option>
-          <option>Chanderi Silk Cotton</option>
-          <option>Polyester Chiffon</option>
-          <option>Cotton Voile</option>
-          <option>Denim Twill</option>
-          <option>Polyester Warp Knit Mesh</option>
-          <option>Rayon Slub</option>
-          <option>Net Fabric (Embroidered)</option>
+          <option>Cotton Single Jersey</option><option>Polyester Georgette</option>
+          <option>Viscose Lycra Blend</option><option>Chanderi Silk Cotton</option>
+          <option>Polyester Chiffon</option><option>Cotton Voile</option>
+          <option>Denim Twill</option><option>Polyester Warp Knit Mesh</option>
+          <option>Rayon Slub</option><option>Net Fabric (Embroidered)</option>
         </select>
       </div>
-
-      <div class="fg">
-        <label for="f_type">Type</label>
-        <select id="f_type">
-          <option value="">Fresh &amp; Lot</option>
-          <option value="Fresh">Fresh</option>
-          <option value="Lot">Lot</option>
-        </select>
-      </div>
-
       <div class="fg">
         <label for="f_machine">Weaving Machine</label>
         <select id="f_machine">
           <option value="">All Machines</option>
-          <option>Circular Knitting</option>
-          <option>Warp Knitting</option>
-          <option>Airjet</option>
-          <option>Phatka Loom</option>
-          <option>Waterjet</option>
-          <option>Rapier</option>
+          <option>Circular Knitting</option><option>Warp Knitting</option>
+          <option>Airjet</option><option>Phatka Loom</option>
+          <option>Waterjet</option><option>Rapier</option>
         </select>
       </div>
-
       <div class="fg">
         <label for="f_job">Job Work</label>
         <select id="f_job">
           <option value="">Any</option>
-          <option>None</option>
-          <option>Embroidery</option>
-          <option>Digital Print</option>
-          <option>Mill Print</option>
-          <option>Other</option>
+          <option>None</option><option>Embroidery</option>
+          <option>Digital Print</option><option>Mill Print</option><option>Other</option>
         </select>
       </div>
-
       <div class="fg">
-        <label for="f_reason">Liquidation Reason</label>
+        <label for="f_reason">Listing Reason</label>
         <select id="f_reason">
           <option value="">Any Reason</option>
-          <option>No demand</option>
-          <option>Outdated design</option>
-          <option>Weaving defect</option>
-          <option>Dyeing defect</option>
-          <option>Panna shrinkage</option>
-          <option>Outdated quality</option>
+          <option>No demand</option><option>Outdated design</option>
+          <option>Weaving defect</option><option>Dyeing defect</option>
+          <option>Panna shrinkage</option><option>Outdated quality</option>
         </select>
       </div>
-
       <div class="fg">
         <label for="f_unit">Quantity Unit</label>
         <select id="f_unit">
           <option value="">Meters &amp; KG</option>
-          <option value="meters">Meters</option>
-          <option value="kg">KG</option>
+          <option value="meters">Meters</option><option value="kg">KG</option>
         </select>
       </div>
-
       <div class="fg">
         <label for="f_gsm_min">GSM Min</label>
         <input type="number" id="f_gsm_min" placeholder="e.g. 80" min="0">
       </div>
-
       <div class="fg">
         <label for="f_gsm_max">GSM Max</label>
         <input type="number" id="f_gsm_max" placeholder="e.g. 300" min="0">
       </div>
-
     </div>
     <div class="filter-actions">
       <button class="btn btn-primary btn-sm" id="applyFilters">Apply Filters</button>
@@ -148,29 +129,92 @@
   </div>
 </div>
 
-<!-- ── Main ─────────────────────────────────────────────────────────────── -->
-<main class="main">
+<!-- ── Search Results (shown only when searching) ──────────────────────── -->
+<main class="main hidden" id="searchResults">
   <div class="results-bar">
     <div class="results-count" id="resultsCount"></div>
-    <button class="link-btn hidden" id="clearTop">Clear filters</button>
+    <button class="link-btn" id="clearTop">Clear filters</button>
   </div>
-
-  <div class="grid" id="grid"></div>
-
-  <div class="loading" id="loading">Loading listings…</div>
-
-  <div class="empty hidden" id="empty">
+  <div class="grid" id="searchGrid"></div>
+  <div class="loading hidden" id="searchLoading">Loading…</div>
+  <div class="empty hidden" id="searchEmpty">
     <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
          stroke-linecap="round" stroke-linejoin="round">
       <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
     </svg>
     <h3>No listings found</h3>
-    <p>Try adjusting your search terms or clearing filters</p>
+    <p>Try adjusting your search or clearing filters</p>
   </div>
 </main>
 
+<!-- ── Homepage Sections (shown when not searching) ────────────────────── -->
+<div id="homeSections">
+
+  <!-- FRESH STOCK -->
+  <section class="listing-section" id="fresh">
+    <div class="section-inner">
+      <div class="section-header">
+        <div class="section-label-wrap">
+          <span class="section-badge badge-fresh-section">Fresh</span>
+          <div>
+            <h2 class="section-title">Fresh Stock</h2>
+            <p class="section-sub">New, unsold fabric direct from mills — full rolls, consistent quality.</p>
+          </div>
+        </div>
+        <a href="#" class="btn btn-outline btn-sm view-all-btn" data-type="Fresh">View All Fresh →</a>
+      </div>
+      <div class="grid" id="freshGrid"></div>
+      <div class="loading" id="freshLoading">Loading…</div>
+      <div class="empty hidden" id="freshEmpty">
+        <h3>No fresh listings yet</h3>
+        <p>Check back soon or <a href="/supplier">list your stock</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIVIDER -->
+  <div class="section-divider-wrap">
+    <div class="section-divider-line"></div>
+    <span class="section-divider-text">Also available</span>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <!-- LOT / SURPLUS -->
+  <section class="listing-section section-lot" id="lot">
+    <div class="section-inner">
+      <div class="section-header">
+        <div class="section-label-wrap">
+          <span class="section-badge badge-lot-section">Lot</span>
+          <div>
+            <h2 class="section-title">Lot / Surplus Stock</h2>
+            <p class="section-sub">Surplus, deadstock and discontinued fabric — liquidation priced for bulk buyers.</p>
+          </div>
+        </div>
+        <a href="#" class="btn btn-outline btn-sm view-all-btn" data-type="Lot">View All Lot →</a>
+      </div>
+      <div class="grid" id="lotGrid"></div>
+      <div class="loading" id="lotLoading">Loading…</div>
+      <div class="empty hidden" id="lotEmpty">
+        <h3>No lot listings yet</h3>
+        <p>Check back soon or <a href="/supplier">list your stock</a></p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ── Footer ───────────────────────────────────────────────────────────── -->
 <footer>
-  CrunchStock — B2B Textile Marketplace · Surat, Gujarat
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <div class="logo-mark" style="width:28px;height:28px;font-size:12px">CS</div>
+      <span style="font-weight:700;color:#111827">CrunchStock</span>
+    </div>
+    <p>Masked B2B Textile Liquidation · Surat, Gujarat</p>
+    <p style="margin-top:4px">
+      <a href="/supplier" style="color:var(--primary);text-decoration:none;font-weight:600">List Your Stock →</a>
+    </p>
+  </div>
 </footer>
 
 <!-- ── Detail Slide Panel ───────────────────────────────────────────────── -->
@@ -201,7 +245,6 @@
         </svg>
       </button>
     </div>
-
     <div class="notice">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -209,25 +252,20 @@
       </svg>
       Your details are only shared with CrunchStock to arrange the swatch — never shown publicly.
     </div>
-
     <form id="swatchForm" novalidate>
       <input type="hidden" id="swatchId">
-
       <div class="fg-form">
         <label for="buyerName">Full Name *</label>
         <input type="text" id="buyerName" placeholder="Your name" required>
       </div>
-
       <div class="fg-form">
         <label for="buyerPhone">Phone Number *</label>
         <input type="tel" id="buyerPhone" placeholder="+91 XXXXX XXXXX" required>
       </div>
-
       <div class="fg-form">
         <label for="buyerAddress">Postal Address *</label>
         <textarea id="buyerAddress" placeholder="Full delivery address for the swatch…" required></textarea>
       </div>
-
       <div class="modal-actions">
         <button type="button" class="btn btn-outline" id="swatchCancel">Cancel</button>
         <button type="submit" class="btn btn-primary">
