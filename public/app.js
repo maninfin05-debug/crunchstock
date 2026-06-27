@@ -28,7 +28,6 @@ function esc(str) {
 
 function $(id) { return document.getElementById(id); }
 
-/* ── API ──────────────────────────────────────────────────────────────── */
 async function apiFetch(url) {
   const res  = await fetch(url);
   const json = await res.json();
@@ -99,17 +98,28 @@ function attachCardListeners(grid) {
   );
 }
 
+/* ── View state ───────────────────────────────────────────────────────── */
+let currentType = '';
+
+function showHome() {
+  $('homeView').classList.remove('hidden');
+  $('listingsView').classList.add('hidden');
+  $('filtersPanel').classList.remove('open');
+  filtersOpen = false;
+  $('filterLabel').textContent = 'Filters';
+  $('searchInput').value = '';
+}
+
+function showListings(type, title) {
+  currentType = type;
+  $('homeView').classList.add('hidden');
+  $('listingsView').classList.remove('hidden');
+  $('listingsTitle').textContent = title;
+  loadListings(type);
+}
+
 /* ── Load listings ────────────────────────────────────────────────────── */
-let activeType = 'Fresh'; // track current tab
-
 async function loadListings(type, extraParams = {}) {
-  activeType = type;
-
-  // Update tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.type === type);
-  });
-
   $('loading').classList.remove('hidden');
   $('grid').innerHTML = '';
   $('empty').classList.add('hidden');
@@ -124,21 +134,17 @@ async function loadListings(type, extraParams = {}) {
     const data = await apiFetch(url);
     $('loading').classList.add('hidden');
 
-    const hasFilters = type !== '' || Object.values(extraParams).some(Boolean);
-    const label = type === 'Fresh' ? 'Fresh' : type === 'Lot' ? 'Lot / Surplus' : '';
-
     if (!data.listings.length) {
       $('empty').classList.remove('hidden');
       $('resultsCount').innerHTML = '';
-      $('clearTop').classList.add('hidden');
       return;
     }
 
+    const label = type === 'Fresh' ? 'Fresh' : type === 'Lot' ? 'Lot / Surplus' : '';
     $('resultsCount').innerHTML = label
       ? `Showing <strong>${data.total}</strong> ${label} listing${data.total !== 1 ? 's' : ''}`
       : `Showing <strong>${data.total}</strong> listing${data.total !== 1 ? 's' : ''}`;
 
-    $('clearTop').classList.toggle('hidden', !hasFilters || type !== '');
     $('grid').innerHTML = data.listings.map(cardHTML).join('');
     attachCardListeners($('grid'));
   } catch {
@@ -147,23 +153,12 @@ async function loadListings(type, extraParams = {}) {
   }
 }
 
-/* ── Tabs ─────────────────────────────────────────────────────────────── */
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    loadListings(btn.dataset.type, gatherFilterParams());
-  });
-});
+/* ── Category card clicks ─────────────────────────────────────────────── */
+$('catFresh').addEventListener('click', () => showListings('Fresh', '🟢 Fresh Stock'));
+$('catLot').addEventListener('click',   () => showListings('Lot',   '🟡 Lot / Surplus'));
 
-/* ── Hero buttons → instant tab switch ───────────────────────────────── */
-$('heroFreshBtn').addEventListener('click', () => {
-  window.scrollTo({ top: document.querySelector('.tab-bar').offsetTop - 116, behavior: 'smooth' });
-  setTimeout(() => loadListings('Fresh'), 100);
-});
-
-$('heroLotBtn').addEventListener('click', () => {
-  window.scrollTo({ top: document.querySelector('.tab-bar').offsetTop - 116, behavior: 'smooth' });
-  setTimeout(() => loadListings('Lot'), 100);
-});
+/* ── Back button ──────────────────────────────────────────────────────── */
+$('backBtn').addEventListener('click', showHome);
 
 /* ── Search ───────────────────────────────────────────────────────────── */
 function gatherFilterParams() {
@@ -178,21 +173,25 @@ function gatherFilterParams() {
 }
 
 function doSearch() {
-  loadListings(activeType, gatherFilterParams());
+  const params = gatherFilterParams();
+  const hasAny = Object.values(params).some(v => v !== '');
+  if (!hasAny) return;
+  showListings('', 'Search Results');
+  // override title after showListings sets it
+  $('listingsTitle').textContent = `🔍 Results for "${params.q || 'filtered'}"`;
+  loadListings('', params);
 }
 
-function clearAll() {
-  $('searchInput').value = '';
+function clearFilters() {
   ['f_machine','f_job','f_unit'].forEach(id => $(id).value = '');
   ['f_gsm_min','f_gsm_max'].forEach(id => $(id).value = '');
-  loadListings(activeType);
+  loadListings(currentType);
 }
 
 $('searchBtn').addEventListener('click', doSearch);
 $('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-$('applyFilters').addEventListener('click', doSearch);
-$('clearFilters').addEventListener('click', clearAll);
-$('clearTop').addEventListener('click', clearAll);
+$('applyFilters').addEventListener('click', () => loadListings(currentType, gatherFilterParams()));
+$('clearFilters').addEventListener('click', clearFilters);
 
 /* ── Filters toggle ───────────────────────────────────────────────────── */
 let filtersOpen = false;
@@ -215,7 +214,8 @@ async function openDetail(id) {
       if (imgs.length) {
         dt.style.background = bg;
         dt.style.height = 'auto';
-        dt.innerHTML = `<img src="${esc(imgs[0])}" style="width:100%;height:200px;object-fit:cover;display:block;">` +
+        dt.innerHTML =
+          `<img src="${esc(imgs[0])}" style="width:100%;height:200px;object-fit:cover;display:block;">` +
           (imgs.length > 1
             ? `<div style="display:flex;gap:6px;padding:8px;background:#f9fafb;border-top:1px solid #e5e7eb;overflow-x:auto">` +
               imgs.slice(1).map(u => `<img src="${esc(u)}" style="height:64px;width:64px;object-fit:cover;border-radius:6px;flex-shrink:0;">`).join('') +
@@ -356,5 +356,4 @@ async function updateStatTotal() {
 
 /* ── Boot ─────────────────────────────────────────────────────────────── */
 const SUBMIT_BTN_HTML = document.querySelector('#swatchForm [type=submit]').innerHTML;
-loadListings('Fresh');
 updateStatTotal();
