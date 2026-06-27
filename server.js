@@ -7,7 +7,7 @@ const { v2: cloudinary } = require('cloudinary');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -30,7 +30,7 @@ function uploadToCloudinary(buffer) {
 // ── Uploads (memory storage for Cloudinary) ───────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { files: 5, fileSize: 5 * 1024 * 1024 },
+  limits: { files: 5, fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only image files are allowed'));
